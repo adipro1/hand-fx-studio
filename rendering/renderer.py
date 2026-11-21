@@ -173,7 +173,7 @@ class Renderer:
             down = self.shaders.program("bloom_down.frag")
             blur = self.shaders.program("blur.frag")
             self.fullscreen(down, self.bloom_a_fbo[0], {"u_src": self.overlay_tex},
-                            {"u_texel": (1.0 / self.width, 1.0 / self.height), "u_threshold": 0.05})
+                            {"u_texel": (1.0 / self.width, 1.0 / self.height), "u_threshold": 0.22})
             aw, ah = self.bloom_a[0].size
             for _ in range(2 if self.quality != "low" else 1):
                 self.fullscreen(blur, self.bloom_a_fbo[1], {"u_src": self.bloom_a[0]}, {"u_dir": (1.5 / aw, 0.0)})

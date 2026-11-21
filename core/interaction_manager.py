@@ -27,8 +27,8 @@ class Binding:
 
 
 DEFAULT_BINDINGS = [
-    Binding("thumbs_up", "next_preset", 0.9),
-    Binding("rock", "next_filter", 0.6),
+    Binding("thumbs_up", "next_preset", 1.2),
+    Binding("rock", "next_filter", 0.8),
     Binding("ok", "none", 1.0),
     Binding("three", "none", 1.0),
 ]

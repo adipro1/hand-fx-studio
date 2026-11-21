@@ -43,10 +43,10 @@ class Canvas:
     def _ensure(self, nl: int, nd: int, nt: int) -> None:
         if nl > self._cap_lines:
             self._cap_lines = max(nl, self._cap_lines * 2)
-            self.line_vbo = self.ctx.buffer(reserve=self._cap_lines * 11 * 4, dynamic=True)
+            self.line_vbo = self.ctx.buffer(reserve=self._cap_lines * 12 * 4, dynamic=True)
             self.line_vao = self.ctx.vertex_array(self.p_lines, [
                 (self.quad_vbo, "2f", "a_corner"),
-                (self.line_vbo, "4f 4f 3f/i", "i_seg", "i_col", "i_style")])
+                (self.line_vbo, "4f 4f 4f/i", "i_seg", "i_col", "i_style")])
         if nd > self._cap_discs:
             self._cap_discs = max(nd, self._cap_discs * 2)
             self.disc_vbo = self.ctx.buffer(reserve=self._cap_discs * 11 * 4, dynamic=True)
@@ -63,7 +63,7 @@ class Canvas:
     def line(self, p0, p1, color, width=2.0, glow=0.0, alpha=1.0, additive=True):
         s = self.px_scale
         self._lines.append((p0[0], p0[1], p1[0], p1[1], color[0], color[1], color[2], alpha,
-                            width * s, glow * s, 1.0 if additive else 0.0))
+                            width * s, glow * s, 1.0 if additive else 0.0, 1.0))
 
     def polyline(self, pts, color, width=2.0, glow=0.0, alpha=1.0, additive=True, closed=False,
                  alphas=None, widths=None):
@@ -76,7 +76,7 @@ class Canvas:
             a = np.vstack([a, pts[-1:]])
             b = np.vstack([b, pts[:1]])
         n = len(a)
-        arr = np.empty((n, 11), dtype="f4")
+        arr = np.empty((n, 12), dtype="f4")
         arr[:, 0:2] = a
         arr[:, 2:4] = b
         col = np.asarray(color, dtype="f4")
@@ -88,12 +88,21 @@ class Canvas:
         arr[:, 8] = (width if widths is None else np.asarray(widths, dtype="f4")[:n]) * self.px_scale
         arr[:, 9] = glow * self.px_scale
         arr[:, 10] = 1.0 if additive else 0.0
+        arr[:, 11] = self._glow_gain(arr)
         self._line_arrays.append(arr)
 
+    def _glow_gain(self, arr: np.ndarray) -> np.ndarray:
+        """Short consecutive segments would stack their glow halos; scale each
+        segment's glow by its length relative to the glow radius."""
+        seg_px = np.hypot((arr[:, 2] - arr[:, 0]) * self.width, (arr[:, 3] - arr[:, 1]) * self.height)
+        return np.clip(seg_px / np.maximum(arr[:, 9] * 2.5, 1e-3), 0.06, 1.0)
+
     def segments(self, arr: np.ndarray):
-        """Raw (N, 11) array: x0 y0 x1 y1 r g b a width glow additive (width/glow in 720p px)."""
+        """Raw (N, 11) array: x0 y0 x1 y1 r g b a width glow additive (width/glow in 720p px).
+        Segments are treated as independent lines (full glow)."""
         if len(arr):
-            a = np.array(arr, dtype="f4", copy=True)
+            a = np.ones((len(arr), 12), dtype="f4")
+            a[:, :11] = arr[:, :11]
             a[:, 8:10] *= self.px_scale
             self._line_arrays.append(a)
 

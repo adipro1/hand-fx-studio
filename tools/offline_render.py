@@ -32,7 +32,8 @@ def main():
     ap.add_argument("--sheet", default=None)
     ap.add_argument("--frames", type=int, default=12)
     ap.add_argument("--mp4", default=None)
-    ap.add_argument("--no-mirror", action="store_true")
+    ap.add_argument("--gesture-actions", action="store_true",
+                    help="allow held gestures to switch presets etc.")
     args = ap.parse_args()
 
     cap = cv2.VideoCapture(args.video)
@@ -41,6 +42,7 @@ def main():
     end = min(args.end, n)
     engine = Engine(None)
     engine.start_offline()
+    engine.interaction.enabled = args.gesture_actions
     if args.preset:
         engine.apply_preset(args.preset)
     if args.effects:

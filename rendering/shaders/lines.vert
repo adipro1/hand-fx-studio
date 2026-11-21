@@ -4,12 +4,12 @@ uniform vec2 u_res;
 in vec2 a_corner;            // (-1|1, -1|1)
 in vec4 i_seg;               // p0.xy, p1.xy (uv)
 in vec4 i_col;               // rgb, opacity
-in vec3 i_style;             // width px, glow px, additive 0/1
+in vec4 i_style;             // width px, glow px, additive 0/1, glow gain
 out vec2 v_px;
 flat out vec2 v_p0;
 flat out vec2 v_p1;
 flat out vec4 v_col;
-flat out vec3 v_style;
+flat out vec4 v_style;
 void main() {
     vec2 p0 = i_seg.xy * u_res;
     vec2 p1 = i_seg.zw * u_res;

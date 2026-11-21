@@ -1,0 +1,7 @@
+* text=auto
+*.bat text eol=crlf
+*.py text eol=lf
+*.glsl text eol=lf
+*.frag text eol=lf
+*.vert text eol=lf
+*.md text eol=lf

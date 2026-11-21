@@ -86,9 +86,11 @@ def classify(h: HandState) -> str:
             return "frame"
         return "point"
     if thumb and all(down[1:]):
-        # thumb pointing up in image space
+        # thumb clearly pointing up in image space, well away from the index finger
         tvec = h.pts[4] - h.pts[2]
-        if tvec[1] < -0.5 * np.linalg.norm(tvec):
+        tip_above_knuckles = h.pts[4, 1] < h.pts[[5, 9], 1].min() - 0.3 * h.scale
+        if (tvec[1] < -0.7 * np.linalg.norm(tvec) and h.pinch_dist > 0.8
+                and tip_above_knuckles and e[0] > 0.7):
             return "thumbs_up"
         return "fist"
     if all(up[1:]):

@@ -12,7 +12,7 @@ void main() {
     vec3 s = texture(u_scene, v_uv).rgb;
     vec4 o = texture(u_overlay, v_uv);
     vec3 c = s * (1.0 - clamp(o.a, 0.0, 1.0)) + o.rgb;
-    c += (texture(u_bloom1, v_uv).rgb * 0.6 + texture(u_bloom2, v_uv).rgb * 0.9) * u_bloom;
+    c += (texture(u_bloom1, v_uv).rgb * 0.5 + texture(u_bloom2, v_uv).rgb * 0.7) * u_bloom;
     // soft shoulder: keeps neon cores white-hot without harsh clipping
     vec3 over = max(c - 0.8, 0.0);
     c = min(c, 0.8) + over / (1.0 + over * 2.5);

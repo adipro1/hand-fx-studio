@@ -126,9 +126,9 @@ class SkeletonEffect(Effect):
             for i, (p, q) in enumerate(HAND_CONNECTIONS):
                 segs[i, 0:4] = (*pts[p], *pts[q])
                 segs[i, 4:7] = self._hand_color(h, style, t, i)
-            segs[:, 7] = a * (0.55 if style == "Minimal" else 0.9)
+            segs[:, 7] = a * (0.55 if style == "Minimal" else 0.7)
             segs[:, 8] = lw * (0.5 if style == "Minimal" else 1.0)
-            segs[:, 9] = 0.0 if style == "Minimal" else glow
+            segs[:, 9] = 0.0 if style == "Minimal" else glow * 0.6
             segs[:, 10] = 1.0
             canvas.segments(segs)
 
@@ -144,11 +144,11 @@ class SkeletonEffect(Effect):
 
             if js > 0:
                 cols = np.array([self._hand_color(h, style, t, i) for i in range(21)], dtype="f4")
-                canvas.sprites(pts, js, cols, alpha=a * 0.9, glow=glow * 0.7, soft=0.0)
-                canvas.sprites(pts, js * 0.45, (1.0, 1.0, 1.0), alpha=a, glow=0.0, soft=0.0)
+                canvas.sprites(pts, js, cols, alpha=a * 0.75, glow=glow * 0.35, soft=0.0)
+                canvas.sprites(pts, js * 0.45, (1.0, 1.0, 1.0), alpha=a * 0.9, glow=0.0, soft=0.0)
                 # brighter fingertips
                 tips = pts[list(TIPS)]
-                canvas.sprites(tips, js * 1.5, cols[list(TIPS)], alpha=a * 0.7, glow=glow * 1.4, soft=0.6)
+                canvas.sprites(tips, js * 1.4, cols[list(TIPS)], alpha=a * 0.35, glow=glow * 0.8, soft=0.6)
 
             if self.p("pulses") and style != "Minimal":
                 for ci, chain in enumerate(CHAINS):
