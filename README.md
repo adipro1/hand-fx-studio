@@ -56,7 +56,7 @@ Everything runs locally: no accounts, no cloud, no subscriptions.
 | **Hold rock / horns (0.8 s)** | Next frame filter *(configurable)* |
 
 ### Keyboard shortcuts
-`R` record · `P` screenshot · `←`/`→` previous/next preset · `1`–`9` presets · `F` next filter ·
+`R` record · `V` camera on/off · `P` screenshot · `←`/`→` previous/next preset · `1`–`9` presets · `F` next filter ·
 `C` clear particles & trails · `Space` pin frame · `Backspace` remove last pin · `Delete` clear pins ·
 `Tab` clean view (hide panels) · `F11` fullscreen · `Esc` exit fullscreen/clean view
 
@@ -119,6 +119,9 @@ Open the **Record** tab (or press `R`).
   After recording, the Record tab shows a preview with **Play** and **Show in folder** buttons.
 
 ---
+
+**Camera on/off:** the **Camera on** button in the top bar (or `V`) turns the webcam off without
+closing the app (the webcam light goes off and other apps can use it); click again to turn it back on.
 
 ## Settings
 

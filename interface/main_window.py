@@ -10,7 +10,7 @@ from datetime import datetime
 import cv2
 import numpy as np
 from PySide6.QtCore import QEvent, QObject, QPointF, QRectF, Qt, QTimer, Signal
-from PySide6.QtGui import (QColor, QFont, QIcon, QKeySequence, QLinearGradient, QPainter, QPen,
+from PySide6.QtGui import (QBrush, QColor, QFont, QFontMetrics, QIcon, QKeySequence, QLinearGradient, QPainter, QPen,
                            QPixmap, QShortcut)
 from PySide6.QtWidgets import (QComboBox, QFrame, QHBoxLayout, QLabel, QMainWindow, QMessageBox,
                                QPushButton, QSizePolicy, QStatusBar, QVBoxLayout, QWidget)
@@ -48,32 +48,41 @@ def make_icon() -> QIcon:
 
 
 class Logo(QWidget):
-    """Icon + wordmark. Built from labels so Qt sizes it correctly at any DPI."""
+    """Icon + wordmark, painted directly so its size always matches what is drawn
+    (stylesheets cannot change the font behind its back)."""
 
-    def __init__(self, parent=None):
+    GAP = 10
+
+    def __init__(self, compact: bool = False, parent=None):
         super().__init__(parent)
-        lay = QHBoxLayout(self)
-        lay.setContentsMargins(0, 0, 0, 0)
-        lay.setSpacing(10)
-        icon = QLabel()
-        icon.setPixmap(make_icon().pixmap(28, 28))
-        lay.addWidget(icon)
-        f = QFont(theme.FONT.split(",")[0], 13)
-        f.setWeight(QFont.Bold)
-        f.setLetterSpacing(QFont.AbsoluteSpacing, 2.0)
-        hand = QLabel("HAND FX")
-        hand.setFont(f)
-        studio = QLabel("STUDIO")
-        studio.setFont(f)
-        studio.setStyleSheet(f"color: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 {theme.CYAN}, "
-                             f"stop:1 {theme.MAGENTA});")
-        for lab in (hand, studio):   # Qt's size hint ignores letter-spacing; add it back
-            lab.setMinimumWidth(lab.sizeHint().width() + int(2.5 * len(lab.text())) + 6)
-        hand.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
-        studio.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-        lay.addWidget(hand)
-        lay.addSpacing(2)
-        lay.addWidget(studio)
+        self._icon = make_icon().pixmap(28, 28)
+        self._font = QFont(theme.FONT.split(",")[0])
+        self._font.setPixelSize(15 if compact else 17)
+        self._font.setWeight(QFont.Bold)
+        self._font.setLetterSpacing(QFont.AbsoluteSpacing, 1.5 if compact else 2.5)
+        fm = QFontMetrics(self._font)
+        self._w1 = fm.horizontalAdvance("HAND FX ")
+        self._w2 = fm.horizontalAdvance("STUDIO")
+        w = 28 + self.GAP + self._w1 + self._w2 + 4
+        self.setFixedSize(w, max(32, fm.height() + 4))
+
+    def paintEvent(self, _):
+        p = QPainter(self)
+        p.setRenderHint(QPainter.Antialiasing)
+        p.setRenderHint(QPainter.TextAntialiasing)
+        h = self.height()
+        p.drawPixmap(0, (h - 28) // 2, self._icon)
+        p.setFont(self._font)
+        x = 28 + self.GAP
+        rect = QRectF(x, 0, self._w1 + self._w2 + 4, h)
+        p.setPen(QColor(theme.TEXT))
+        p.drawText(rect, Qt.AlignVCenter | Qt.AlignLeft, "HAND FX ")
+        grad = QLinearGradient(x + self._w1, 0, x + self._w1 + self._w2, 0)
+        grad.setColorAt(0, QColor(theme.CYAN))
+        grad.setColorAt(1, QColor(theme.MAGENTA))
+        p.setPen(QPen(QBrush(grad), 1))
+        p.drawText(QRectF(x + self._w1, 0, self._w2 + 4, h), Qt.AlignVCenter | Qt.AlignLeft, "STUDIO")
+        p.end()
 
 
 class _Bridge(QObject):
@@ -96,6 +105,7 @@ class MainWindow(QMainWindow):
         self._clean = False
         self._thumb_time: dict[str, float] = {}
         self._starting = False
+        self._camera_on = True
         self._bridge = _Bridge()
         self._bridge.started.connect(self._on_started)
 
@@ -135,15 +145,17 @@ class MainWindow(QMainWindow):
         th = QHBoxLayout(top)
         th.setContentsMargins(16, 8, 16, 8)
         th.setSpacing(10)
-        th.addWidget(Logo())
+        th.addWidget(Logo(self.compact))
         th.addSpacing(8 if self.compact else 20)
-        lab = QLabel("Preset")
-        lab.setObjectName("muted")
-        th.addWidget(lab)
+        if not self.compact:                 # small screens: the dropdown speaks for itself
+            lab = QLabel("Preset")
+            lab.setObjectName("muted")
+            th.addWidget(lab)
         self.preset_box = QComboBox()
         self.preset_box.addItems(PRESET_NAMES)
         self.preset_box.setCurrentText(self.engine.preset)
-        self.preset_box.setMinimumWidth(160)
+        self.preset_box.setMinimumWidth(150 if self.compact else 160)
+        self.preset_box.setToolTip("Preset (← / →)")
         self.preset_box.currentTextChanged.connect(self._apply_preset)
         th.addWidget(self.preset_box)
         prev_b = QPushButton("‹")
@@ -160,11 +172,16 @@ class MainWindow(QMainWindow):
         th.addWidget(next_b)
         th.addSpacing(16)
         self.intensity = LabeledSlider("Intensity", 0, 1.5, self.settings.render.master_intensity, 0.01)
-        self.intensity.setFixedWidth(150 if self.compact else 200)
+        self.intensity.setFixedWidth(130 if self.compact else 200)
         self.intensity.valueChanged.connect(self._set_intensity)
         th.addWidget(self.intensity)
         th.addSpacing(16)
         th.addStretch()
+        self.cam_btn = QPushButton()
+        self.cam_btn.setObjectName("ghost")
+        self.cam_btn.setToolTip("Turn the webcam on / off without closing the app (V)")
+        self.cam_btn.clicked.connect(self.toggle_camera)
+        th.addWidget(self.cam_btn)
         self.clean_btn = QPushButton("Clean view" if self.compact else "Clean view  (Tab)")
         self.clean_btn.setToolTip("Hide panels (Tab)")
         self.clean_btn.setObjectName("ghost")
@@ -215,7 +232,7 @@ class MainWindow(QMainWindow):
         self.sb_render = QLabel("Render: —")
         for w in (self.sb_gpu, self.sb_cam, self.sb_trk, self.sb_render):
             sb.addWidget(w)
-        hint = QLabel("Shortcuts: R record · Space pin frame · Del clear pins · P screenshot · ←/→ presets · F next filter · Tab clean view")
+        hint = QLabel("Shortcuts: R record · V camera on/off · Space pin frame · Del clear pins · P screenshot · ←/→ presets · F next filter · Tab clean view")
         sb.addPermanentWidget(hint)
         first = next((e for e in self.engine.effects if e.enabled), self.engine.effects[0])
         self._select_effect(first)
@@ -233,6 +250,7 @@ class MainWindow(QMainWindow):
             Qt.Key_Right: lambda: self._cycle_preset(1), Qt.Key_Left: lambda: self._cycle_preset(-1),
             Qt.Key_F: lambda: self.engine.perform_action("next_filter"),
             Qt.Key_C: lambda: self.engine.perform_action("reset_effects"),
+            Qt.Key_V: self.toggle_camera,
             Qt.Key_Space: lambda: self.engine.perform_action("pin_frame"),
             Qt.Key_Backspace: lambda: self.engine.perform_action("remove_last_pin"),
             Qt.Key_Delete: lambda: self.engine.perform_action("clear_pins"),
@@ -270,9 +288,40 @@ class MainWindow(QMainWindow):
             return
         self._launch_live()
 
+    def _set_cam_button(self):
+        on = self._camera_on
+        self.cam_btn.setText(("◉  Camera on" if on else "○  Camera off") if not self.compact
+                             else ("◉ Cam on" if on else "○ Cam off"))
+        self.cam_btn.setStyleSheet("" if on else "color: #ff6b81;")
+
+    def toggle_camera(self):
+        if self._starting:
+            self.preview.toast("Camera is still starting...")
+            return
+        if self._camera_on:
+            if self._countdown_end is not None:
+                self._countdown_end = None
+                self.rec_btn.setText("●  REC")
+            if self.recorder.recording:
+                self.toggle_record()          # saves the video first
+            self.timer.stop()
+            self.engine.stop_live()           # releases the webcam (its light turns off)
+            self._camera_on = False
+            self._last_frame = None
+            self.preview.clear("Camera is off",
+                               "Click “Camera off” in the top bar (or press V) to turn it back on.")
+            log.info("camera turned off")
+        else:
+            log.info("camera turned on")
+            self._launch_live()
+        self._set_cam_button()
+
     def _launch_live(self):
         if self._starting:
             return
+        self._camera_on = True
+        if hasattr(self, "cam_btn"):
+            self._set_cam_button()
         self._starting = True
         self.preview.message = "Starting camera and hand tracking..."
         self.preview.submessage = "First launch downloads the hand-tracking model (≈8 MB)."

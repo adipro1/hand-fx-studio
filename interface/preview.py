@@ -50,6 +50,15 @@ class PreviewWidget(QWidget):
         self.message = None
         self.update()
 
+    def clear(self, message: str, submessage: str = ""):
+        """Remove the camera image and show a message instead (e.g. camera turned off)."""
+        self._img = None
+        self._buf = None
+        self.cine = None
+        self.message = message
+        self.submessage = submessage
+        self.update()
+
     def toast(self, text: str):
         self._toast = (time.perf_counter(), text)
         self.update()
