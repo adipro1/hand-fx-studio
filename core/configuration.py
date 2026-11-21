@@ -37,6 +37,7 @@ class TrackingSettings:
     process_width: int = 640         # tracking resolution (lower = faster)
     lost_grace: float = 0.3          # seconds a lost hand fades out
     confirm_time: float = 0.12       # gesture confirmation interval
+    low_light: bool = False          # contrast boost for dark / backlit rooms
 
 
 @dataclass

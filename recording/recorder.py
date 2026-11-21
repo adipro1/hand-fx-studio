@@ -90,6 +90,7 @@ class Recorder:
         self._proc: subprocess.Popen | None = None
         self._cv_writer = None
         self._smooth_focus = 0.5
+        self._last_slot = -1
 
     # ------------------------------------------------------------------ control
     def start(self, out_dir: str, fmt: str = "16:9", resolution: int = 1080, fps: int = 30,
@@ -113,7 +114,8 @@ class Recorder:
             cmd = [exe, "-hide_banner", "-loglevel", "error", "-y",
                    "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", f"{self.out_w}x{self.out_h}",
                    "-r", str(self.fps), "-i", "-",
-                   "-c:v", "libx264", "-preset", "veryfast", "-crf", str(int(crf)),
+                   "-c:v", "libx264", "-preset", "superfast" if max(self.out_w, self.out_h) > 1280 else "veryfast",
+                   "-crf", str(int(crf)),
                    "-pix_fmt", "yuv420p", "-movflags", "+faststart", self.path]
             flags = 0x08000000 if sys.platform == "win32" else 0   # CREATE_NO_WINDOW
             try:
@@ -130,6 +132,7 @@ class Recorder:
                 raise RuntimeError("Could not create the video file. Check that the output "
                                    f"folder is writable:\n{out_dir}")
         self._q = queue.Queue(maxsize=36)   # ~1 s of frames buffered for the encoder
+        self._last_slot = -1
         self._t0 = time.perf_counter()
         self.recording = True
         self._thread = threading.Thread(target=self._worker, name="RecorderThread", daemon=True)
@@ -145,7 +148,13 @@ class Recorder:
             self.focus_x = float(focus_x)
         try:
             if t is None:
-                self._q.put_nowait((time.perf_counter(), rgb.copy(), self.focus_x))
+                now = time.perf_counter()
+                # only queue frames that start a new output frame (render may run faster than video fps)
+                slot = int((now - self._t0) * self.fps)
+                if slot <= self._last_slot:
+                    return
+                self._last_slot = slot
+                self._q.put_nowait((now, rgb.copy(), self.focus_x))
             else:   # offline / timestamped frames: never drop, wait for the encoder
                 self._q.put((self._t0 + t, rgb.copy(), self.focus_x), timeout=30)
         except queue.Full:
@@ -190,7 +199,7 @@ class Recorder:
         x, y, cw, ch = crop_rect(self.fmt, w, h, fx)
         crop = rgb[y:y + ch, x:x + cw]
         if (cw, ch) != (self.out_w, self.out_h):
-            interp = cv2.INTER_AREA if cw > self.out_w else cv2.INTER_LANCZOS4
+            interp = cv2.INTER_AREA if cw > self.out_w else cv2.INTER_LINEAR
             crop = cv2.resize(crop, (self.out_w, self.out_h), interpolation=interp)
         return np.ascontiguousarray(crop)
 
