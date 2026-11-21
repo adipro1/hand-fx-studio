@@ -19,12 +19,12 @@ import numpy as np
 from core.filters import ExpSmoother
 from core.hand_tracker import HandState, TrackingResult
 
-GESTURES = ("none", "open_palm", "fist", "peace", "point", "thumbs_up", "pinch",
-            "rock", "three", "ok")
+GESTURES = ("none", "open_palm", "fist", "peace", "point", "frame", "thumbs_up",
+            "pinch", "rock", "three", "ok")
 
 GESTURE_LABELS = {
     "none": "—", "open_palm": "Open palm", "fist": "Fist", "peace": "Peace",
-    "point": "Pointing", "thumbs_up": "Thumbs up", "pinch": "Pinch",
+    "point": "Pointing", "frame": "L-frame", "thumbs_up": "Thumbs up", "pinch": "Pinch",
     "rock": "Rock / horns", "three": "Three", "ok": "OK sign",
 }
 
@@ -80,6 +80,10 @@ def classify(h: HandState) -> str:
     if index and middle and ring and down[4]:
         return "three"
     if index and down[2] and down[3] and down[4]:
+        # thumb sticking out sideways = L-shaped "camera frame" hand
+        thumb_len = np.linalg.norm(h.pts[4] - h.pts[2]) / h.scale
+        if e[0] > 0.45 and thumb_len > 0.55:
+            return "frame"
         return "point"
     if thumb and all(down[1:]):
         # thumb pointing up in image space

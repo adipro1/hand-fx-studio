@@ -130,6 +130,7 @@ class TrackingResult:
     frame_index: int
     inference_ms: float = 0.0
     aspect: float = 16 / 9
+    image: np.ndarray | None = None   # the exact frame these landmarks belong to
 
     def by_label(self, label: str) -> HandState | None:
         for h in self.hands:
@@ -226,6 +227,8 @@ class HandTracker:
         self.process_width = process_width
         self.lost_grace = lost_grace
         self.smoothing = smoothing
+        self.low_light_boost = False
+        self._clahe = cv2.createCLAHE(clipLimit=2.5, tileGridSize=(8, 8))
         self.error: str | None = None
         self.fps = 0.0
 
@@ -310,6 +313,11 @@ class HandTracker:
             small = cv2.resize(image_bgr, (self.process_width, ph), interpolation=cv2.INTER_AREA)
         else:
             small = image_bgr
+        if self.low_light_boost:
+            # Contrast-limited equalisation helps when hands are dark / backlit.
+            lab = cv2.cvtColor(small, cv2.COLOR_BGR2LAB)
+            lab[:, :, 0] = self._clahe.apply(lab[:, :, 0])
+            small = cv2.cvtColor(lab, cv2.COLOR_LAB2BGR)
         rgb = cv2.cvtColor(small, cv2.COLOR_BGR2RGB)
         mp_img = self._mp.Image(image_format=self._mp.ImageFormat.SRGB, data=np.ascontiguousarray(rgb))
         ts_ms = int(timestamp * 1000)
@@ -369,7 +377,7 @@ class HandTracker:
                 track.filter.reset()
 
         hands.sort(key=lambda s: 0 if s.label == "Left" else 1)
-        return TrackingResult(hands, timestamp, frame_index, inf_ms, aspect)
+        return TrackingResult(hands, timestamp, frame_index, inf_ms, aspect, image_bgr)
 
     def _loop(self) -> None:
         last_idx = -1
