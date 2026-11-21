@@ -39,6 +39,10 @@ Everything runs locally: no accounts, no cloud, no subscriptions.
 |---|---|
 | **L-shape with both hands** (thumbs + index fingers) | Opens the **Filter Frame** / **Glass Prism** lens between your hands |
 | **Touch all four fingertips together, then reopen** | Closes the frame → switches to the next filter |
+| **Hold the frame still ~1 s** *(ring fills up)* or **quick pinch-tap** one hand | **Pins** the filter frame in the air — it stays while you make new ones |
+| **Pinch inside a pinned frame** and move | Drags the pinned frame somewhere else |
+| **Point at a pinned frame** for 0.6 s | Changes that frame's filter |
+| **Hold two fists** for 1 s | Clears all pinned frames |
 | **Pinch** (thumb + index) | Magnifying lens bubble, plasma orb, gathers particles — strength follows how closed the pinch is |
 | **Open palm** | Energy field, one-hand portal, pushes particles away, palm mandala |
 | **Close your fist** | Shockwave through the image + particle explosion |
@@ -53,7 +57,8 @@ Everything runs locally: no accounts, no cloud, no subscriptions.
 
 ### Keyboard shortcuts
 `R` record · `P` screenshot · `←`/`→` previous/next preset · `1`–`9` presets · `F` next filter ·
-`C` clear particles & trails · `Tab` clean view (hide panels) · `F11` fullscreen · `Esc` exit fullscreen/clean view
+`C` clear particles & trails · `Space` pin frame · `Backspace` remove last pin · `Delete` clear pins ·
+`Tab` clean view (hide panels) · `F11` fullscreen · `Esc` exit fullscreen/clean view
 
 ---
 
@@ -81,7 +86,7 @@ glowing overlays are drawn on top. Reorder layers in the **Studio** tab.
 | Geometry | **Sacred Geometry** | Fingertip web, glowing facets, 3D wireframe solids (icosahedron, geodesic sphere, cube, octahedron), palm mandalas, mirror symmetry. |
 
 ### Presets
-Filter Frame · Finger Bands · Glass Prism · Tracking HUD · Reality Bender · Energy Master ·
+Filter Frame · Pin Studio · Finger Bands · Glass Prism · Tracking HUD · Reality Bender · Energy Master ·
 Portal · Sacred Geometry · Psychedelic · Neon Particles · Total Chaos · Clean Camera
 
 The first four recreate the four reference videos (see [REFERENCE_ANALYSIS.md](REFERENCE_ANALYSIS.md)).
@@ -99,6 +104,15 @@ Open the **Record** tab (or press `R`).
 - **Crop guide:** the preview shades what will be cut off in vertical/square mode
 - The video contains the **final composition with all effects**, encoded as H.264 MP4
   (plays on phones and uploads directly to TikTok/Instagram/YouTube).
+- **Cinematic HUD** (on by default): recordings get a sci-fi heads-up display baked in — target
+  reticles and data cards on each hand (gesture, confidence, pinch/spread/openness, wrist angle,
+  fingertip XYZ), a rangefinder between your hands, live SYSTEM stats (FPS, render/inference time,
+  camera rate, GPU), ACTIVE FX list, pinned-frame tags, motion-energy graphs, a radar, a scrolling
+  event log, REC timecode with frame counter, and glitch callouts for big moments (SHOCKWAVE,
+  PINNED, FILTER changes). Styles: **Cyber**, **Military**, **Synthwave**; detail **Full** or
+  **Minimal**. The HUD is laid out separately for 9:16 vertical video and shows in the preview while
+  recording (or always, if you switch that on).
+- **3-2-1 countdown** before recording starts (press `R` again to cancel).
 - Default folder: `Videos\HandFXStudio` (screenshots go in `Videos\HandFXStudio\Screenshots`).
   After recording, the Record tab shows a preview with **Play** and **Show in folder** buttons.
 
@@ -142,6 +156,7 @@ core/
                            graceful tracking loss, derived features (extension, angles, palm
                            orientation, rotation, velocity, pinch, spread, scale)
   filters.py               One-Euro and exponential smoothing
+  telemetry.py             per-frame data snapshot + event log for the cinematic HUD
   gesture_recognition.py   continuous values + debounced gestures + events (fist_close,
                            pinch_start, circle, swipe, hands_together...)
   interaction_manager.py   held-gesture → action bindings with cooldowns
@@ -162,9 +177,10 @@ rendering/
   filter_modes.py          stylised filter catalogue
   shaders/                 GLSL: filters, region/bands masks, warp, liquid sim, kaleido,
                            portal, colour, bloom, composite, canvas primitives
-interface/                 PySide6 UI: main window, effects library, preview + HUD, settings tabs
+interface/                 PySide6 UI: main window, effects library, preview, settings tabs;
+                           hud.py = cinematic HUD painter (same code draws preview and video)
 recording/recorder.py      FFmpeg H.264 encoder thread, constant-FPS timeline, crops, smart framing
-tests/                     pytest suite (tracking filters, gestures, recorder, GPU pipeline, presets)
+tests/                     pytest suite (tracking filters, gestures, pins, HUD, recorder, GPU, presets)
 tools/                     developer tools: offline renderer, filter gallery
 ```
 

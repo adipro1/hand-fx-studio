@@ -16,6 +16,7 @@ from core.configuration import AppSettings
 from core.gesture_recognition import GestureFrame, GestureRecognizer
 from core.hand_tracker import HandTracker, TrackingResult
 from core.interaction_manager import InteractionManager
+from core.telemetry import Telemetry, TelemetryCollector
 from effects import create_effects
 from effects.base_effect import Effect, FrameContext
 from effects.presets import PRESETS, PRESET_NAMES
@@ -40,6 +41,8 @@ class Engine:
         self._last_t: float | None = None
         self._t0 = time.perf_counter()
         self._blank: np.ndarray | None = None
+        self.telemetry_collector = TelemetryCollector()
+        self.telemetry = Telemetry()
         self._load_effect_settings()
 
     # ------------------------------------------------------------------ setup
@@ -139,6 +142,11 @@ class Engine:
             ff = self.effect("filter_frame")
             if ff:
                 ff.next_filter()
+        elif action in ("pin_frame", "remove_last_pin", "clear_pins"):
+            ff = self.effect("filter_frame")
+            if ff:
+                {"pin_frame": lambda: ff.pin_now(time.perf_counter() - self._t0),
+                 "remove_last_pin": ff.remove_last_pin, "clear_pins": ff.clear_pins}[action]()
         elif action == "reset_effects":
             for e in self.effects:
                 e.reset()
@@ -189,6 +197,11 @@ class Engine:
         self.stats["update_ms"] = self.stats["update_ms"] * 0.9 + (t1 - t0) * 1000 * 0.1
         self.stats["render_ms"] = self.stats["render_ms"] * 0.9 + self.renderer.gpu_ms * 0.1
         self.stats["hands"] = len(tr.hands)
+        try:
+            self.telemetry = self.telemetry_collector.update(self, ctx)
+        except Exception:   # the HUD must never break rendering
+            import logging
+            logging.getLogger("hfx").exception("telemetry")
         return out
 
     def process_frame(self, image_bgr: np.ndarray, t: float, index: int) -> np.ndarray:

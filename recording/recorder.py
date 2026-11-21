@@ -91,6 +91,7 @@ class Recorder:
         self._cv_writer = None
         self._smooth_focus = 0.5
         self._last_slot = -1
+        self.hud = None            # optional interface.hud.HudRenderer drawn onto every frame
 
     # ------------------------------------------------------------------ control
     def start(self, out_dir: str, fmt: str = "16:9", resolution: int = 1080, fps: int = 30,
@@ -139,7 +140,7 @@ class Recorder:
         self._thread.start()
         return self.path
 
-    def push(self, rgb: np.ndarray, focus_x: float | None = None, t: float | None = None) -> None:
+    def push(self, rgb: np.ndarray, focus_x: float | None = None, t: float | None = None, hud=None) -> None:
         """Queue a rendered RGB frame. Never blocks the render loop.
         ``t`` overrides the capture time (seconds since start; used by tests/offline)."""
         if not self.recording:
@@ -154,9 +155,9 @@ class Recorder:
                 if slot <= self._last_slot:
                     return
                 self._last_slot = slot
-                self._q.put_nowait((now, rgb.copy(), self.focus_x))
+                self._q.put_nowait((now, rgb.copy(), self.focus_x, hud))
             else:   # offline / timestamped frames: never drop, wait for the encoder
-                self._q.put((self._t0 + t, rgb.copy(), self.focus_x), timeout=30)
+                self._q.put((self._t0 + t, rgb.copy(), self.focus_x, hud), timeout=30)
         except queue.Full:
             self.frames_dropped += 1
 
@@ -189,7 +190,7 @@ class Recorder:
         return time.perf_counter() - self._t0 if self.recording else 0.0
 
     # ------------------------------------------------------------------ worker
-    def _prepare(self, rgb: np.ndarray, focus: float) -> np.ndarray:
+    def _prepare(self, rgb: np.ndarray, focus: float, tel=None) -> np.ndarray:
         h, w = rgb.shape[:2]
         if self.smart and self.fmt in ("9:16", "1:1"):
             self._smooth_focus += (focus - self._smooth_focus) * 0.08
@@ -201,7 +202,20 @@ class Recorder:
         if (cw, ch) != (self.out_w, self.out_h):
             interp = cv2.INTER_AREA if cw > self.out_w else cv2.INTER_LINEAR
             crop = cv2.resize(crop, (self.out_w, self.out_h), interpolation=interp)
-        return np.ascontiguousarray(crop)
+        crop = np.ascontiguousarray(crop)
+        if self.hud is not None and tel is not None:
+            import copy
+            from interface.hud import draw_on_rgb
+            tel = copy.copy(tel)
+            tel.recording = True
+            tel.countdown = 0.0
+            tel.rec_frames = self.frames_written
+            tel.rec_time = self.frames_written / self.fps
+            try:
+                draw_on_rgb(self.hud, crop, tel, (x / w, y / h, cw / w, ch / h))
+            except Exception as exc:   # a HUD problem must never stop the recording
+                self.hud_error = str(exc)
+        return crop
 
     def _write(self, frame: np.ndarray) -> None:
         if self._proc:
@@ -212,13 +226,20 @@ class Recorder:
 
     def _worker(self) -> None:
         last = None
+        if self.hud is not None:     # load fonts once before the first real frame
+            try:
+                from core.telemetry import Telemetry
+                from interface.hud import draw_on_rgb
+                draw_on_rgb(self.hud, np.zeros((self.out_h, self.out_w, 3), np.uint8), Telemetry())
+            except Exception as exc:
+                self.hud_error = str(exc)
         while True:
             item = self._q.get()
             if item is None:
                 break
-            t, rgb, focus = item
+            t, rgb, focus, tel = item
             try:
-                frame = self._prepare(rgb, focus)
+                frame = self._prepare(rgb, focus, tel)
                 target = int((t - self._t0) * self.fps) + 1
                 # duplicate the previous frame to fill gaps, drop if we're ahead
                 while last is not None and self.frames_written < target - 1:

@@ -31,6 +31,7 @@ class ParamsTab(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.effect = None
+        self.action_cb = None
         self._controls: dict = {}
         self.lay = QVBoxLayout(self)
         self.lay.setContentsMargins(4, 8, 8, 8)
@@ -97,6 +98,20 @@ class ParamsTab(QWidget):
         self.status.setVisible(False)
         self.error.setVisible(False)
 
+        if effect.id == "filter_frame":
+            self.lay.addWidget(section("Pinned frames"))
+            row = QHBoxLayout()
+            for label, action in (("Pin now  (Space)", "pin_frame"), ("Remove last", "remove_last_pin"),
+                                  ("Clear all", "clear_pins")):
+                b = QPushButton(label)
+                b.clicked.connect(lambda _=False, a=action: self.action_cb and self.action_cb(a))
+                row.addWidget(b)
+            self.lay.addLayout(row)
+            tip = QLabel("Hold the frame still ~1 s or quick-pinch one hand to pin it. Pinch inside a "
+                         "pinned frame to move it, point at it to change its filter, hold two fists to clear.")
+            tip.setObjectName("dim")
+            tip.setWordWrap(True)
+            self.lay.addWidget(tip)
         self.lay.addWidget(section("Settings"))
         for p in effect.PARAMS:
             w = self._make_control(effect, p)
@@ -469,6 +484,26 @@ class RecordTab(QWidget):
         self.guide = ToggleSwitch(True)
         self.guide.toggled.connect(lambda _: self.guide_changed.emit())
         lay.addWidget(Row("Show crop guide in preview", self.guide))
+
+        lay.addWidget(section("Cinematic HUD"))
+        self.hud = ToggleSwitch(rs.hud)
+        self.hud.toggled.connect(lambda v: setattr(rs, "hud", bool(v)))
+        lay.addWidget(Row("Sci-fi HUD in recordings", self.hud,
+                          "Overlays live tracking data, reticles, timecode, system stats and an event log "
+                          "on the video. Shown in the preview while recording."))
+        from interface.hud import DETAILS, STYLE_NAMES
+        self.hud_style = SegmentedControl(tuple(STYLE_NAMES), rs.hud_style if rs.hud_style in STYLE_NAMES else "Cyber")
+        self.hud_style.changed.connect(lambda v: setattr(rs, "hud_style", v))
+        lay.addWidget(Row("Style", self.hud_style))
+        self.hud_detail = SegmentedControl(tuple(DETAILS), rs.hud_detail if rs.hud_detail in DETAILS else "Full")
+        self.hud_detail.changed.connect(lambda v: setattr(rs, "hud_detail", v))
+        lay.addWidget(Row("Detail", self.hud_detail))
+        self.hud_always = ToggleSwitch(rs.hud_always)
+        self.hud_always.toggled.connect(lambda v: setattr(rs, "hud_always", bool(v)))
+        lay.addWidget(Row("Show HUD when not recording", self.hud_always))
+        self.countdown = ToggleSwitch(rs.countdown)
+        self.countdown.toggled.connect(lambda v: setattr(rs, "countdown", bool(v)))
+        lay.addWidget(Row("3-2-1 countdown before recording", self.countdown))
 
         lay.addWidget(section("Output folder"))
         self.dir_label = QLabel(rs.output_dir)

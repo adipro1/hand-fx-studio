@@ -9,7 +9,7 @@ from datetime import datetime
 
 import cv2
 import numpy as np
-from PySide6.QtCore import QObject, QPointF, QRectF, Qt, QTimer, Signal
+from PySide6.QtCore import QEvent, QObject, QPointF, QRectF, Qt, QTimer, Signal
 from PySide6.QtGui import (QColor, QFont, QIcon, QKeySequence, QLinearGradient, QPainter, QPen,
                            QPixmap, QShortcut)
 from PySide6.QtWidgets import (QComboBox, QFrame, QHBoxLayout, QLabel, QMainWindow, QMessageBox,
@@ -91,6 +91,8 @@ class MainWindow(QMainWindow):
         self._frames = 0
         self._fps_t = time.perf_counter()
         self._fps = 0.0
+        self._countdown_end: float | None = None
+        self._cine = None
         self._clean = False
         self._thumb_time: dict[str, float] = {}
         self._starting = False
@@ -106,6 +108,9 @@ class MainWindow(QMainWindow):
         self.setMinimumSize(980, 600)
         self._build()
         self._shortcuts()
+        from PySide6.QtWidgets import QApplication
+        QApplication.instance().installEventFilter(self)
+        self.side.params.action_cb = self.engine.perform_action
 
         self.timer = QTimer(self)
         self.timer.setTimerType(Qt.PreciseTimer)
@@ -210,7 +215,7 @@ class MainWindow(QMainWindow):
         self.sb_render = QLabel("Render: —")
         for w in (self.sb_gpu, self.sb_cam, self.sb_trk, self.sb_render):
             sb.addWidget(w)
-        hint = QLabel("Shortcuts: R record · P screenshot · ←/→ presets · F next filter · C clear · Tab clean view · F11 fullscreen")
+        hint = QLabel("Shortcuts: R record · Space pin frame · Del clear pins · P screenshot · ←/→ presets · F next filter · Tab clean view")
         sb.addPermanentWidget(hint)
         first = next((e for e in self.engine.effects if e.enabled), self.engine.effects[0])
         self._select_effect(first)
@@ -228,9 +233,23 @@ class MainWindow(QMainWindow):
             Qt.Key_Right: lambda: self._cycle_preset(1), Qt.Key_Left: lambda: self._cycle_preset(-1),
             Qt.Key_F: lambda: self.engine.perform_action("next_filter"),
             Qt.Key_C: lambda: self.engine.perform_action("reset_effects"),
+            Qt.Key_Space: lambda: self.engine.perform_action("pin_frame"),
+            Qt.Key_Backspace: lambda: self.engine.perform_action("remove_last_pin"),
+            Qt.Key_Delete: lambda: self.engine.perform_action("clear_pins"),
         }
         for i in range(min(9, len(PRESET_NAMES))):
             self._keys[Qt.Key_1 + i] = lambda i=i: self._apply_preset(PRESET_NAMES[i])
+
+    def eventFilter(self, obj, event):
+        # Space / Backspace / Delete would otherwise be eaten by focused buttons and switches.
+        if event.type() == QEvent.KeyPress and event.key() in (Qt.Key_Space, Qt.Key_Backspace, Qt.Key_Delete):
+            from PySide6.QtWidgets import QAbstractSpinBox, QApplication, QLineEdit
+            fw = QApplication.focusWidget()
+            if not isinstance(fw, (QLineEdit, QAbstractSpinBox)) and self.isActiveWindow():
+                if not event.isAutoRepeat():
+                    self._keys[event.key()]()
+                return True
+        return super().eventFilter(obj, event)
 
     def keyPressEvent(self, event):
         fn = self._keys.get(event.key())
@@ -308,9 +327,33 @@ class MainWindow(QMainWindow):
                 self.preview.update()
             return
         self._last_frame = img
+        rs = self.settings.recording
+        tel = self.engine.telemetry
+        tel.fps = self._fps
+        tel.recording = self.recorder.recording
+        tel.rec_time = self.recorder.duration
+        tel.rec_frames = self.recorder.frames_written
+        tel.countdown = 0.0
+        if self._countdown_end is not None:
+            left = self._countdown_end - time.perf_counter()
+            if left <= 0:
+                self._countdown_end = None
+                self._start_or_stop_record()
+            else:
+                tel.countdown = left
+                self.rec_btn.setText(f"…  {int(left) + 1}")
+        show = rs.hud and (self.recorder.recording or rs.hud_always or tel.countdown > 0)
+        if show:
+            if self._cine is None or (self._cine.style, self._cine.detail) != (rs.hud_style, rs.hud_detail):
+                from interface.hud import HudRenderer
+                self._cine = HudRenderer(rs.hud_style, rs.hud_detail)
+            self.preview.cine = self._cine
+            self.preview.telemetry = tel
+        else:
+            self.preview.cine = None
         self.preview.set_frame(img)
         if self.recorder.recording:
-            self.recorder.push(img, self._focus_x())
+            self.recorder.push(img, self._focus_x(), hud=tel if self.recorder.hud is not None else None)
             if self.recorder.error:
                 err = self.recorder.error
                 self.toggle_record()
@@ -450,11 +493,26 @@ class MainWindow(QMainWindow):
 
     def toggle_record(self):
         rs = self.settings.recording
+        if self._countdown_end is not None:          # pressed again during the countdown: cancel
+            self._countdown_end = None
+            self.rec_btn.setText("●  REC")
+            self.preview.toast("Recording cancelled")
+            return
+        if not self.recorder.recording and rs.countdown and self._last_frame is not None:
+            self._countdown_end = time.perf_counter() + 3.0
+            self.rec_btn.setText("…  3")
+            return
+        self._start_or_stop_record()
+
+    def _start_or_stop_record(self):
+        rs = self.settings.recording
         if not self.recorder.recording:
             if self._last_frame is None:
                 self.preview.toast("No camera image yet")
                 return
             h, w = self._last_frame.shape[:2]
+            from interface.hud import HudRenderer
+            self.recorder.hud = HudRenderer(rs.hud_style, rs.hud_detail) if rs.hud else None
             try:
                 path = self.recorder.start(rs.output_dir, rs.format, rs.resolution, rs.fps, rs.quality, (w, h),
                                            self.side.record.smart.isChecked())

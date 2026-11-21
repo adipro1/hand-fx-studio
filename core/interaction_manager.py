@@ -15,6 +15,9 @@ ACTIONS = {
     "screenshot": "Take screenshot",
     "toggle_record": "Start / stop recording",
     "reset_effects": "Clear particles & trails",
+    "pin_frame": "Pin the current filter frame",
+    "remove_last_pin": "Remove last pinned frame",
+    "clear_pins": "Clear all pinned frames",
 }
 
 

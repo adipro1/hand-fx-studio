@@ -6,6 +6,12 @@ PRESETS: dict[str, dict] = {
         "desc": "Reference 02 — L-frame lens with stylised filters. Close the frame to switch.",
         "effects": {"filter_frame": {}, "skeleton": {"style": "Minimal", "trails": False, "opacity": 0.5}},
     },
+    "Pin Studio": {
+        "desc": "Build a collage of filter windows: hold a frame still (or quick-pinch) to pin it, "
+                "pinch inside to move, point to change its filter, two fists to clear.",
+        "effects": {"filter_frame": {"filter": "Thermal", "shuffle": True},
+                    "skeleton": {"style": "Minimal", "trails": False, "opacity": 0.5}},
+    },
     "Finger Bands": {
         "desc": "Reference 03 — layered reality strips between matching fingertips.",
         "effects": {"finger_bands": {}, "skeleton": {"style": "Minimal", "trails": False, "opacity": 0.35}},

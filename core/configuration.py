@@ -56,6 +56,11 @@ class RecordingSettings:
     resolution: int = 1080           # short-side pixels for 9:16 / long for 16:9 handled in recorder
     fps: int = 30
     quality: int = 20                # x264 CRF (lower = better)
+    hud: bool = True                 # cinematic sci-fi HUD baked into recordings
+    hud_style: str = "Cyber"
+    hud_detail: str = "Full"
+    hud_always: bool = False         # also show the HUD when not recording
+    countdown: bool = True           # 3-2-1 before recording starts
 
 
 @dataclass

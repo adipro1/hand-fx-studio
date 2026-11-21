@@ -32,6 +32,8 @@ class PreviewWidget(QWidget):
         self.crop_focus = 0.5
         self._toast: tuple[float, str] | None = None
         self._img_rect = QRectF()
+        self.cine = None          # interface.hud.HudRenderer when the cinematic HUD is shown
+        self.telemetry = None
 
     # ------------------------------------------------------------------
     def set_frame(self, rgb: np.ndarray):
@@ -65,13 +67,31 @@ class PreviewWidget(QWidget):
             p.drawImage(r.topLeft(), self._img)
             if self.crop_guide:
                 self._draw_crop_guide(p, r)
-            p.setClipping(False)
-            if self.hud:
-                self._draw_hud(p, r)
+            if self.cine is not None and self.telemetry is not None:
+                hr, crop = self._crop_rect(r)
+                try:
+                    self.cine.draw(p, hr, self.telemetry, crop)
+                except Exception:  # never let the HUD break the preview
+                    import logging
+                    logging.getLogger("hfx").exception("hud")
+                p.setClipping(False)
+            else:
+                p.setClipping(False)
+                if self.hud:
+                    self._draw_hud(p, r)
         if self.message:
             self._draw_message(p)
         if self._toast:
             self._draw_toast(p, r if self._img is not None else QRectF(self.rect()))
+
+    def _crop_rect(self, r: QRectF):
+        target = {"9:16": 9 / 16, "1:1": 1.0}.get(self.crop_guide or "")
+        if not target:
+            return r, (0.0, 0.0, 1.0, 1.0)
+        cw = r.height() * target
+        x = r.left() + self.crop_focus * r.width() - cw / 2
+        x = max(r.left(), min(r.right() - cw, x))
+        return QRectF(x, r.top(), cw, r.height()), ((x - r.left()) / r.width(), 0.0, cw / r.width(), 1.0)
 
     def _draw_crop_guide(self, p: QPainter, r: QRectF):
         target = {"9:16": 9 / 16, "1:1": 1.0}.get(self.crop_guide)
