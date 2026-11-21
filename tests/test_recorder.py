@@ -8,6 +8,7 @@ from recording.recorder import Recorder, crop_rect, output_size
 
 def test_output_sizes():
     assert output_size("9:16", 1080, 1280, 720) == (1080, 1920)
+    assert output_size("Story", 720, 1280, 720) == (1080, 1920)
     assert output_size("16:9", 720, 1280, 720) == (1280, 720)
     assert output_size("1:1", 720, 1280, 720) == (720, 720)
 

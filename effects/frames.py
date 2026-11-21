@@ -94,7 +94,7 @@ class FilterFrameEffect(Effect):
     name = "Filter Frame"
     description = ("Make an L-shape with both hands: the area between your thumbs and index "
                    "fingers becomes a lens with a stylised filter. Touch the fingertips "
-                   "together to switch filter. Hold the frame still (or quick-pinch) to pin it "
+                   "together to switch filter. Hold the frame still for a second to pin it "
                    "in the air; pinch inside a pinned frame to move it, point at it to change "
                    "its filter, hold two fists to clear.")
     category = "Reference FX"
@@ -119,8 +119,6 @@ class FilterFrameEffect(Effect):
         Param("pin_hold_enabled", "Pin: hold frame still", "bool", True,
               tip="Keep the two-hand frame still to freeze it in the air."),
         Param("pin_hold_time", "Pin: hold time (s)", "float", 1.0, 0.5, 2.5, 0.05),
-        Param("pin_tap_enabled", "Pin: quick pinch-tap", "bool", True,
-              tip="While holding the frame, quickly pinch one thumb and index together and release."),
         Param("pin_grab", "Pinch inside a pin to move it", "bool", True),
         Param("pin_point_cycle", "Point at a pin to change its filter", "bool", True),
         Param("pin_clear_fists", "Two fists (1 s) clear all pins", "bool", True),
@@ -128,7 +126,6 @@ class FilterFrameEffect(Effect):
     ]
 
     STILL_THR = 0.015         # aspect units of vertex movement that still counts as "still"
-    TAP_MAX = 0.40            # seconds: a pinch shorter than this is a tap
     GRAB_DELAY = 0.30         # seconds a pinch must be held before it grabs a pin
     POINT_TIME = 0.6
     CLEAR_TIME = 1.0
@@ -145,12 +142,10 @@ class FilterFrameEffect(Effect):
         self._rng = np.random.default_rng()
         self.pins: list[Pin] = []
         self._next_pin_id = 1
-        self._hist: deque = deque(maxlen=90)       # (t, poly) of the two-hand frame
         self._still_ref = None
         self._still_t = 0.0
         self._dwell_armed = True
         self.dwell_progress = 0.0
-        self._taps: dict[int, tuple[float, np.ndarray]] = {}
         self._pinch_since: dict[int, float] = {}
         self._grabs: dict[int, tuple[Pin, np.ndarray]] = {}
         self._point: dict[int, list] = {}           # hand_id -> [pin_id, t, done]
@@ -158,12 +153,9 @@ class FilterFrameEffect(Effect):
         self._clear_done = False
         self.clear_progress = 0.0
         self.notices: list[str] = []                # short messages for the HUD / toasts
-        self._last_close_t = -1e9
 
     def reset(self):
-        self._hist.clear()
         self._grabs.clear()
-        self._taps.clear()
 
     def on_param_changed(self, key):
         if key == "filter":
@@ -218,14 +210,6 @@ class FilterFrameEffect(Effect):
     def pins_info(self) -> list[dict]:
         return [{"id": p.id, "poly": p.poly.copy(), "name": p.name, "grabbed": p.grabbed} for p in self.pins]
 
-    def _poly_at(self, t: float) -> np.ndarray | None:
-        best = None
-        for ht, p in reversed(self._hist):
-            best = p
-            if ht <= t:
-                break
-        return best
-
     # ------------------------------------------------------------------ update
     def update(self, ctx: FrameContext):
         q = two_hand_quad(ctx)
@@ -244,7 +228,6 @@ class FilterFrameEffect(Effect):
                 if not self._closed and span < scale * 0.55:
                     self._closed = True
                     self._closed_time = 0.0
-                    self._last_close_t = ctx.t
                 elif self._closed:
                     self._closed_time += ctx.dt
                     if span > scale * 1.1:
@@ -255,10 +238,7 @@ class FilterFrameEffect(Effect):
         self._flash = max(0.0, self._flash - ctx.dt * 2.5)
 
         frame_open = self._two and not self._closed and span > scale * 1.2
-        if frame_open:
-            self._hist.append((ctx.t, self._poly.copy()))
         self._update_dwell(ctx, frame_open)
-        self._update_taps(ctx)
         self._update_grabs(ctx)
         self._update_point(ctx)
         self._update_clear(ctx)
@@ -297,24 +277,6 @@ class FilterFrameEffect(Effect):
             self.dwell_progress = min(1.0, (self._still_t - 0.25) / max(hold - 0.25, 0.05))
         if self._still_t >= hold:
             self.add_pin(self._poly, ctx.t)
-
-    def _update_taps(self, ctx):
-        if not self.p("pin_tap_enabled"):
-            self._taps.clear()
-            return
-        for name, hid, data in ctx.events:
-            if name == "pinch_start":
-                before = self._poly_at(ctx.t - 0.08)
-                if before is not None and self._hist and ctx.t - self._hist[-1][0] < 0.25:
-                    self._taps[hid] = (ctx.t, before)
-            elif name == "pinch_end" and hid in self._taps:
-                t0, poly = self._taps.pop(hid)
-                # a close-to-switch-filter gesture also pinches: never pin in that case
-                if ctx.t - t0 <= self.TAP_MAX and not self._closed and self._last_close_t < t0 - 0.1:
-                    self.add_pin(poly, ctx.t)
-        for hid in list(self._taps):
-            if ctx.t - self._taps[hid][0] > self.TAP_MAX:
-                del self._taps[hid]
 
     def _update_grabs(self, ctx):
         live = set()

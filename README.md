@@ -39,7 +39,7 @@ Everything runs locally: no accounts, no cloud, no subscriptions.
 |---|---|
 | **L-shape with both hands** (thumbs + index fingers) | Opens the **Filter Frame** / **Glass Prism** lens between your hands |
 | **Touch all four fingertips together, then reopen** | Closes the frame → switches to the next filter |
-| **Hold the frame still ~1 s** *(ring fills up)* or **quick pinch-tap** one hand | **Pins** the filter frame in the air — it stays while you make new ones |
+| **Hold the frame still ~1 s** *(ring fills up)* | **Pins** the filter frame in the air — it stays while you make new ones |
 | **Pinch inside a pinned frame** and move | Drags the pinned frame somewhere else |
 | **Point at a pinned frame** for 0.6 s | Changes that frame's filter |
 | **Hold two fists** for 1 s | Clears all pinned frames |
@@ -98,7 +98,9 @@ Your changes to effects are remembered between sessions.
 
 Open the **Record** tab (or press `R`).
 
-- **Format:** 16:9 (YouTube), **9:16 vertical (TikTok / Reels / Shorts)**, 1:1 (square)
+- **Format:** 16:9 (YouTube), **9:16 vertical (TikTok / Reels / Shorts)**, **Story (Instagram Story,
+  always 1080×1920; the HUD stays clear of the zones Instagram covers with its profile bar and reply
+  box, and the preview shades those zones)**, 1:1 (square)
 - **Resolution:** 720p or 1080p · **Frame rate:** 24 / 30 / 60 · **Quality** slider
 - **Smart framing:** in 9:16 and 1:1 the crop window glides to keep your hands in shot
 - **Crop guide:** the preview shades what will be cut off in vertical/square mode

@@ -7,10 +7,15 @@ from __future__ import annotations
 
 import json
 import os
+import sys
+import tempfile
 from dataclasses import asdict, dataclass, field
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-SETTINGS_PATH = os.path.join(ROOT, "user_settings.json")
+# Automated self-tests use their own settings file so they never touch the user's settings.
+SETTINGS_PATH = (os.environ.get("HFX_SETTINGS")
+                 or (os.path.join(tempfile.gettempdir(), "hfx_selftest_settings.json")
+                     if "--selftest" in sys.argv else os.path.join(ROOT, "user_settings.json")))
 
 
 def default_recordings_dir() -> str:

@@ -108,7 +108,7 @@ class HudRenderer:
         p.setBrush(Qt.NoBrush)
 
     # ------------------------------------------------------------------ main entry
-    def draw(self, p: QPainter, rect: QRectF, tel: Telemetry, crop=(0.0, 0.0, 1.0, 1.0)):
+    def draw(self, p: QPainter, rect: QRectF, tel: Telemetry, crop=(0.0, 0.0, 1.0, 1.0), safe=(0.0, 0.0)):
         """Paint the HUD into ``rect``. ``crop`` = (u0, v0, uw, vh): the source-uv window
         that ``rect`` shows (for 9:16 / 1:1 crops)."""
         W, H = rect.width(), rect.height()
@@ -132,6 +132,9 @@ class HudRenderer:
         full = self.detail != "Minimal"
         vertical = H > W * 1.2
         L, T, R, B = rect.left(), rect.top(), rect.right(), rect.bottom()
+        # keep HUD furniture out of areas covered by app UI (Instagram Story top bar / reply box)
+        T += H * safe[0]
+        B -= H * safe[1]
         pad = 14 * k
 
         # ---- ambient: vignette ticks, scan sweep, faint grid
@@ -307,7 +310,7 @@ class HudRenderer:
                        9 * k, _c(C["a"] if pin.get("grabbed") else C["t"], 235), bold=True)
 
         if full:
-            self._panels(p, rect, tel, k, C, vertical, pad)
+            self._panels(p, QRectF(L, T, W, B - T), tel, k, C, vertical, pad)
 
         # ---- event flash callout (glitch text)
         if tel.flash:
@@ -413,7 +416,7 @@ class HudRenderer:
         # radar
         rr = bh * 0.5 - 6 * k
         rc = QPointF(r.right() + 16 * k + rr, by + bh / 2)
-        if rc.x() + rr < R - pad - (0 if vertical else 240 * k):
+        if not vertical and rc.x() + rr < R - pad - 240 * k:
             p.setPen(self._pen(_c(C["p"], 90), 1 * k))
             p.drawEllipse(rc, rr, rr)
             p.drawEllipse(rc, rr * 0.5, rr * 0.5)
@@ -446,13 +449,14 @@ class HudRenderer:
             y += 12 * k
 
 
-def draw_on_rgb(hud: HudRenderer, frame: np.ndarray, tel: Telemetry, crop=(0.0, 0.0, 1.0, 1.0)) -> np.ndarray:
+def draw_on_rgb(hud: HudRenderer, frame: np.ndarray, tel: Telemetry, crop=(0.0, 0.0, 1.0, 1.0),
+                safe=(0.0, 0.0)) -> np.ndarray:
     """Draw the HUD in place onto a contiguous HxWx3 uint8 RGB array (any thread)."""
     h, w = frame.shape[:2]
     img = QImage(frame.data, w, h, 3 * w, QImage.Format_RGB888)
     p = QPainter(img)
     try:
-        hud.draw(p, QRectF(0, 0, w, h), tel, crop)
+        hud.draw(p, QRectF(0, 0, w, h), tel, crop, safe)
     finally:
         p.end()
     return frame

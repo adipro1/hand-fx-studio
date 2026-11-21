@@ -1,4 +1,4 @@
-"""Pinned filter frames: hold-still pin, quick pinch-tap pin, grab, point-to-cycle, clear."""
+"""Pinned filter frames: hold-still pin, grab, point-to-cycle, clear."""
 import numpy as np
 
 from core.gesture_recognition import GestureFrame, HandGesture
@@ -71,35 +71,6 @@ def test_moving_frame_never_pins():
     assert e.pins == []
 
 
-def test_quick_pinch_tap_pins_shape_before_tap():
-    e = FilterFrameEffect()
-    e.set_param("pin_hold_enabled", False)
-    s = Sim(e)
-    for _ in range(10):
-        s.step(QUAD)
-    s.step(QUAD, events=[("pinch_start", 2, {})])
-    distorted = QUAD.copy()
-    distorted[1] = distorted[2]          # tap collapses one corner
-    for _ in range(4):
-        s.step(distorted)
-    s.step(QUAD, events=[("pinch_end", 2, {})])
-    assert len(e.pins) == 1
-    assert np.allclose(e.pins[0].poly, QUAD, atol=1e-3)
-
-
-def test_long_pinch_does_not_pin():
-    e = FilterFrameEffect()
-    e.set_param("pin_hold_enabled", False)
-    s = Sim(e)
-    for _ in range(10):
-        s.step(QUAD)
-    s.step(QUAD, events=[("pinch_start", 2, {})])
-    for _ in range(20):                  # 0.66 s > tap limit
-        s.step(QUAD)
-    s.step(QUAD, events=[("pinch_end", 2, {})])
-    assert e.pins == []
-
-
 def test_pinch_grab_moves_pin():
     e = FilterFrameEffect()
     e.add_pin(QUAD)
@@ -146,18 +117,13 @@ def test_inside_poly():
     assert not inside_poly(np.array([0.30 * ASPECT + 0.001, 0.5]), QUAD, ASPECT, margin=0.02)
 
 
-def test_close_to_switch_does_not_pin():
+def test_pinch_taps_never_pin():
     e = FilterFrameEffect()
     e.set_param("pin_hold_enabled", False)
     s = Sim(e)
     for _ in range(10):
         s.step(QUAD)
-    tiny = np.full_like(QUAD, 0.5)
-    tiny += np.array([[0, 0], [0.005, 0], [0.005, 0.005], [0, 0.005]], dtype="f4")
-    s.step(QUAD, events=[("pinch_start", 1, {}), ("pinch_start", 2, {})])
-    for _ in range(5):
-        s.step(tiny)
-    s.step(QUAD, events=[("pinch_end", 1, {}), ("pinch_end", 2, {})])
     for _ in range(3):
-        s.step(QUAD)
+        s.step(QUAD, events=[("pinch_start", 2, {})])
+        s.step(QUAD, events=[("pinch_end", 2, {})])
     assert e.pins == []

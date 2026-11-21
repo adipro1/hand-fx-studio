@@ -7,7 +7,7 @@ PRESETS: dict[str, dict] = {
         "effects": {"filter_frame": {}, "skeleton": {"style": "Minimal", "trails": False, "opacity": 0.5}},
     },
     "Pin Studio": {
-        "desc": "Build a collage of filter windows: hold a frame still (or quick-pinch) to pin it, "
+        "desc": "Build a collage of filter windows: hold a frame still for a second to pin it, "
                 "pinch inside to move, point to change its filter, two fists to clear.",
         "effects": {"filter_frame": {"filter": "Thermal", "shuffle": True},
                     "skeleton": {"style": "Minimal", "trails": False, "opacity": 0.5}},

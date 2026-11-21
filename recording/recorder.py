@@ -22,7 +22,9 @@ from datetime import datetime
 import cv2
 import numpy as np
 
-FORMATS = ("16:9", "9:16", "1:1", "source")
+FORMATS = ("16:9", "9:16", "Story", "1:1", "source")
+# Instagram covers the top / bottom of a Story with its own UI (profile bar, reply box).
+STORY_SAFE = (0.13, 0.18)
 RESOLUTIONS = (720, 1080)
 
 
@@ -38,6 +40,8 @@ def output_size(fmt: str, resolution: int, src_w: int, src_h: int) -> tuple[int,
     """Final video size. ``resolution`` is the short side (720 / 1080)."""
     def even(x):
         return int(round(x / 2.0)) * 2
+    if fmt == "Story":                       # Instagram Story: always 1080x1920
+        return 1080, 1920
     if fmt == "9:16":
         return even(resolution), even(resolution * 16 / 9)
     if fmt == "1:1":
@@ -50,7 +54,7 @@ def output_size(fmt: str, resolution: int, src_w: int, src_h: int) -> tuple[int,
 
 def crop_rect(fmt: str, src_w: int, src_h: int, focus_x: float = 0.5) -> tuple[int, int, int, int]:
     """(x, y, w, h) crop of the source frame for the target aspect."""
-    target = {"9:16": 9 / 16, "1:1": 1.0, "16:9": 16 / 9}.get(fmt, src_w / src_h)
+    target = {"9:16": 9 / 16, "Story": 9 / 16, "1:1": 1.0, "16:9": 16 / 9}.get(fmt, src_w / src_h)
     src_aspect = src_w / src_h
     if abs(target - src_aspect) < 1e-3:
         return 0, 0, src_w, src_h
@@ -102,7 +106,7 @@ class Recorder:
         self.error = None
         os.makedirs(out_dir, exist_ok=True)
         stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        tag = {"9:16": "vertical", "1:1": "square", "16:9": "wide"}.get(fmt, "source")
+        tag = {"9:16": "vertical", "Story": "igstory", "1:1": "square", "16:9": "wide"}.get(fmt, "source")
         self.path = os.path.join(out_dir, f"{prefix}_{stamp}_{tag}.mp4")
         self.fmt, self.fps, self.smart = fmt, int(fps), smart_framing
         self.src_w, self.src_h = src_size
@@ -192,7 +196,7 @@ class Recorder:
     # ------------------------------------------------------------------ worker
     def _prepare(self, rgb: np.ndarray, focus: float, tel=None) -> np.ndarray:
         h, w = rgb.shape[:2]
-        if self.smart and self.fmt in ("9:16", "1:1"):
+        if self.smart and self.fmt in ("9:16", "Story", "1:1"):
             self._smooth_focus += (focus - self._smooth_focus) * 0.08
             fx = self._smooth_focus
         else:
@@ -212,7 +216,8 @@ class Recorder:
             tel.rec_frames = self.frames_written
             tel.rec_time = self.frames_written / self.fps
             try:
-                draw_on_rgb(self.hud, crop, tel, (x / w, y / h, cw / w, ch / h))
+                draw_on_rgb(self.hud, crop, tel, (x / w, y / h, cw / w, ch / h),
+                            STORY_SAFE if self.fmt == "Story" else (0.0, 0.0))
             except Exception as exc:   # a HUD problem must never stop the recording
                 self.hud_error = str(exc)
         return crop

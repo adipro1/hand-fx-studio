@@ -5,7 +5,7 @@ import time
 
 import cv2
 import numpy as np
-from PySide6.QtCore import QRectF, Qt
+from PySide6.QtCore import QPointF, QRectF, Qt
 from PySide6.QtGui import QColor, QFont, QImage, QPainter, QPainterPath, QPen
 from PySide6.QtWidgets import QWidget
 
@@ -70,7 +70,8 @@ class PreviewWidget(QWidget):
             if self.cine is not None and self.telemetry is not None:
                 hr, crop = self._crop_rect(r)
                 try:
-                    self.cine.draw(p, hr, self.telemetry, crop)
+                    self.cine.draw(p, hr, self.telemetry, crop,
+                                   (0.13, 0.18) if self.crop_guide == "Story" else (0.0, 0.0))
                 except Exception:  # never let the HUD break the preview
                     import logging
                     logging.getLogger("hfx").exception("hud")
@@ -85,7 +86,7 @@ class PreviewWidget(QWidget):
             self._draw_toast(p, r if self._img is not None else QRectF(self.rect()))
 
     def _crop_rect(self, r: QRectF):
-        target = {"9:16": 9 / 16, "1:1": 1.0}.get(self.crop_guide or "")
+        target = {"9:16": 9 / 16, "Story": 9 / 16, "1:1": 1.0}.get(self.crop_guide or "")
         if not target:
             return r, (0.0, 0.0, 1.0, 1.0)
         cw = r.height() * target
@@ -94,7 +95,7 @@ class PreviewWidget(QWidget):
         return QRectF(x, r.top(), cw, r.height()), ((x - r.left()) / r.width(), 0.0, cw / r.width(), 1.0)
 
     def _draw_crop_guide(self, p: QPainter, r: QRectF):
-        target = {"9:16": 9 / 16, "1:1": 1.0}.get(self.crop_guide)
+        target = {"9:16": 9 / 16, "Story": 9 / 16, "1:1": 1.0}.get(self.crop_guide)
         if not target:
             return
         cw = r.height() * target
@@ -106,6 +107,15 @@ class PreviewWidget(QWidget):
         p.setPen(QPen(QColor(255, 255, 255, 120), 1, Qt.DashLine))
         p.setBrush(Qt.NoBrush)
         p.drawRect(QRectF(x, r.top() + 1, cw, r.height() - 2))
+        if self.crop_guide == "Story":       # Instagram UI zones (profile bar / reply box)
+            from recording.recorder import STORY_SAFE
+            top, bot = r.height() * STORY_SAFE[0], r.height() * STORY_SAFE[1]
+            band = QColor(0, 0, 0, 60)
+            p.fillRect(QRectF(x, r.top(), cw, top), band)
+            p.fillRect(QRectF(x, r.bottom() - bot, cw, bot), band)
+            p.setPen(QPen(QColor(255, 255, 255, 90), 1, Qt.DotLine))
+            p.drawLine(QPointF(x, r.top() + top), QPointF(x + cw, r.top() + top))
+            p.drawLine(QPointF(x, r.bottom() - bot), QPointF(x + cw, r.bottom() - bot))
 
     def _chip(self, p: QPainter, x: float, y: float, text: str, color: str, dot: str | None = None) -> float:
         f = QFont(theme.FONT.split(",")[0], 9)

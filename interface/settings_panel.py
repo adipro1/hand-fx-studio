@@ -107,7 +107,7 @@ class ParamsTab(QWidget):
                 b.clicked.connect(lambda _=False, a=action: self.action_cb and self.action_cb(a))
                 row.addWidget(b)
             self.lay.addLayout(row)
-            tip = QLabel("Hold the frame still ~1 s or quick-pinch one hand to pin it. Pinch inside a "
+            tip = QLabel("Hold the frame still ~1 s to pin it. Pinch inside a "
                          "pinned frame to move it, point at it to change its filter, hold two fists to clear.")
             tip.setObjectName("dim")
             tip.setWordWrap(True)
@@ -463,10 +463,13 @@ class RecordTab(QWidget):
         lay.setContentsMargins(4, 8, 8, 8)
         lay.setSpacing(6)
         lay.addWidget(section("Format"))
-        self.fmt = SegmentedControl(("16:9", "9:16", "1:1"), rs.format if rs.format in ("16:9", "9:16", "1:1") else "16:9")
+        self.fmt = SegmentedControl(("16:9", "9:16", "Story", "1:1"),
+                                    rs.format if rs.format in ("16:9", "9:16", "Story", "1:1") else "16:9")
         self.fmt.changed.connect(self._fmt)
         lay.addWidget(self.fmt)
-        fmt_hint = QLabel("9:16 = vertical for TikTok / Reels / Shorts. 16:9 = YouTube.")
+        fmt_hint = QLabel("9:16 = TikTok / Reels / Shorts. Story = Instagram Story (1080×1920, HUD kept clear "
+                          "of Instagram's buttons; Instagram splits stories into 60 s parts). 16:9 = YouTube.")
+        fmt_hint.setWordWrap(True)
         fmt_hint.setObjectName("dim")
         lay.addWidget(fmt_hint)
         self.res = SegmentedControl(("720p", "1080p"), f"{rs.resolution}p" if rs.resolution in (720, 1080) else "1080p")
@@ -480,7 +483,7 @@ class RecordTab(QWidget):
         lay.addWidget(self.quality)
         self.smart = ToggleSwitch(True)
         lay.addWidget(Row("Smart framing (follow hands)", self.smart,
-                          "In 9:16 and 1:1, the crop window glides to keep your hands in shot."))
+                          "In vertical and square formats, the crop window glides to keep your hands in shot."))
         self.guide = ToggleSwitch(True)
         self.guide.toggled.connect(lambda _: self.guide_changed.emit())
         lay.addWidget(Row("Show crop guide in preview", self.guide))
