@@ -92,6 +92,9 @@ def main() -> int:
                 li = win.recorder.last_info
                 log.info("selftest recording: %s %dx%d frames=%d dur=%.1fs dropped=%d err=%s", li.path,
                          li.width, li.height, li.frames, li.duration, li.dropped, win.recorder.error)
+            g = lambda w: (w.geometry().x(), w.geometry().width(), w.minimumSizeHint().width())
+            log.info("selftest geometry: window=%d effects=%s preview=%s side=%s", win.width(),
+                     g(win.effects_panel), g(win.preview), g(win.side))
             win.grab().save(out)
             log.info("selftest: fps=%.1f render=%.1fms hands=%d capture=%s", win._fps,
                      win.engine.stats["render_ms"], win.engine.stats["hands"], out)

@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import math
 
-import moderngl
 import numpy as np
 
 from core.hand_tracker import TIPS
@@ -39,6 +38,8 @@ class LiquidWarpEffect(Effect):
         self._field = None
 
     def setup_gpu(self, r):
+        for obj in getattr(self, "_fbo", []) + getattr(self, "_tex", []):
+            obj.release()
         w, h = max(r.width // 3, 32), max(r.height // 3, 32)
         self._tex = [r.make_texture(w, h, 4, "f2") for _ in range(2)]
         self._fbo = [r.ctx.framebuffer([t]) for t in self._tex]

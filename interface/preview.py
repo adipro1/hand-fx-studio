@@ -16,7 +16,7 @@ from interface import theme
 class PreviewWidget(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setMinimumSize(480, 270)
+        self.setMinimumSize(320, 200)
         self.setAttribute(Qt.WA_OpaquePaintEvent)
         self._img: QImage | None = None
         self._buf: np.ndarray | None = None

@@ -60,7 +60,7 @@ class Logo(QWidget):
         lay.addWidget(icon)
         f = QFont(theme.FONT.split(",")[0], 13)
         f.setWeight(QFont.Bold)
-        f.setLetterSpacing(QFont.AbsoluteSpacing, 2.5)
+        f.setLetterSpacing(QFont.AbsoluteSpacing, 2.0)
         hand = QLabel("HAND FX")
         hand.setFont(f)
         studio = QLabel("STUDIO")
@@ -68,9 +68,11 @@ class Logo(QWidget):
         studio.setStyleSheet(f"color: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 {theme.CYAN}, "
                              f"stop:1 {theme.MAGENTA});")
         for lab in (hand, studio):   # Qt's size hint ignores letter-spacing; add it back
-            lab.setMinimumWidth(lab.sizeHint().width() + int(3 * len(lab.text())) + 4)
+            lab.setMinimumWidth(lab.sizeHint().width() + int(2.5 * len(lab.text())) + 6)
+        hand.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        studio.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
         lay.addWidget(hand)
-        lay.addSpacing(4)
+        lay.addSpacing(2)
         lay.addWidget(studio)
 
 
@@ -99,9 +101,9 @@ class MainWindow(QMainWindow):
         self.setWindowIcon(make_icon())
         from PySide6.QtGui import QGuiApplication
         avail = QGuiApplication.primaryScreen().availableGeometry()
-        self.compact = avail.width() < 1700
+        self.compact = avail.width() < 1500
         self.resize(min(1600, int(avail.width() * 0.94)), min(940, int(avail.height() * 0.92)))
-        self.setMinimumSize(1000, 640)
+        self.setMinimumSize(980, 600)
         self._build()
         self._shortcuts()
 
@@ -129,14 +131,14 @@ class MainWindow(QMainWindow):
         th.setContentsMargins(16, 8, 16, 8)
         th.setSpacing(10)
         th.addWidget(Logo())
-        th.addSpacing(20)
+        th.addSpacing(8 if self.compact else 20)
         lab = QLabel("Preset")
         lab.setObjectName("muted")
         th.addWidget(lab)
         self.preset_box = QComboBox()
         self.preset_box.addItems(PRESET_NAMES)
         self.preset_box.setCurrentText(self.engine.preset)
-        self.preset_box.setMinimumWidth(180)
+        self.preset_box.setMinimumWidth(160)
         self.preset_box.currentTextChanged.connect(self._apply_preset)
         th.addWidget(self.preset_box)
         prev_b = QPushButton("‹")
@@ -153,12 +155,13 @@ class MainWindow(QMainWindow):
         th.addWidget(next_b)
         th.addSpacing(16)
         self.intensity = LabeledSlider("Intensity", 0, 1.5, self.settings.render.master_intensity, 0.01)
-        self.intensity.setFixedWidth(170 if self.compact else 200)
+        self.intensity.setFixedWidth(150 if self.compact else 200)
         self.intensity.valueChanged.connect(self._set_intensity)
         th.addWidget(self.intensity)
         th.addSpacing(16)
         th.addStretch()
-        self.clean_btn = QPushButton("Clean view  (Tab)")
+        self.clean_btn = QPushButton("Clean view" if self.compact else "Clean view  (Tab)")
+        self.clean_btn.setToolTip("Hide panels (Tab)")
         self.clean_btn.setObjectName("ghost")
         self.clean_btn.clicked.connect(self.toggle_clean)
         th.addWidget(self.clean_btn)
@@ -176,7 +179,7 @@ class MainWindow(QMainWindow):
         body.setContentsMargins(10, 10, 10, 8)
         body.setSpacing(10)
         self.effects_panel = EffectsPanel(self.engine.effects)
-        self.effects_panel.setFixedWidth(300 if self.compact else 340)
+        self.effects_panel.setFixedWidth(280 if self.compact else 340)
         self.effects_panel.selected.connect(self._select_effect)
         self.effects_panel.toggled.connect(self._toggle_effect)
         body.addWidget(self.effects_panel)
@@ -184,7 +187,7 @@ class MainWindow(QMainWindow):
         self.preview.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         body.addWidget(self.preview, 1)
         self.side = SettingsPanel(self.engine)
-        self.side.setFixedWidth(320 if self.compact else 360)
+        self.side.setFixedWidth(310 if self.compact else 360)
         body.addWidget(self.side)
         v.addLayout(body, 1)
 
@@ -213,19 +216,28 @@ class MainWindow(QMainWindow):
         self._select_effect(first)
 
     def _shortcuts(self):
+        # Only non-character keys are global shortcuts. Letters, digits and arrows are handled
+        # in keyPressEvent, which only sees keys that a focused text field / slider didn't use.
         def sc(key, fn):
             QShortcut(QKeySequence(key), self, activated=fn)
-        sc("R", self.toggle_record)
-        sc("P", self.screenshot)
         sc("Tab", self.toggle_clean)
         sc("F11", self.toggle_fullscreen)
         sc("Escape", self._escape)
-        sc("Right", lambda: self._cycle_preset(1))
-        sc("Left", lambda: self._cycle_preset(-1))
-        sc("F", lambda: self.engine.perform_action("next_filter"))
-        sc("C", lambda: self.engine.perform_action("reset_effects"))
+        self._keys = {
+            Qt.Key_R: self.toggle_record, Qt.Key_P: self.screenshot,
+            Qt.Key_Right: lambda: self._cycle_preset(1), Qt.Key_Left: lambda: self._cycle_preset(-1),
+            Qt.Key_F: lambda: self.engine.perform_action("next_filter"),
+            Qt.Key_C: lambda: self.engine.perform_action("reset_effects"),
+        }
         for i in range(min(9, len(PRESET_NAMES))):
-            sc(str(i + 1), lambda i=i: self._apply_preset(PRESET_NAMES[i]))
+            self._keys[Qt.Key_1 + i] = lambda i=i: self._apply_preset(PRESET_NAMES[i])
+
+    def keyPressEvent(self, event):
+        fn = self._keys.get(event.key())
+        if fn and not event.isAutoRepeat() and not (event.modifiers() & (Qt.ControlModifier | Qt.AltModifier)):
+            fn()
+            return
+        super().keyPressEvent(event)
 
     # ------------------------------------------------------------------ engine lifecycle
     def _start_engine(self):

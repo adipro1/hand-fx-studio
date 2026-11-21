@@ -56,6 +56,7 @@ class Renderer:
     def resize(self, width: int, height: int) -> None:
         if (width, height) == (self.width, self.height):
             return
+        self._release_targets()
         self.width, self.height = width, height
         self.aspect = width / height
         ctx = self.ctx
@@ -82,6 +83,17 @@ class Renderer:
         self.out_fbo = ctx.framebuffer([self.out_tex])
         self.canvas = Canvas(ctx, self.shaders, width, height)
         self._cur = 0
+
+    def _release_targets(self) -> None:
+        """Free GPU memory of the previous size (moderngl does not garbage-collect)."""
+        for name in ("scene_fbo", "bloom_a_fbo", "bloom_b_fbo", "scene", "bloom_a", "bloom_b"):
+            for obj in getattr(self, name, []) or []:
+                obj.release()
+        for name in ("overlay_fbo", "out_fbo", "overlay_tex", "out_tex", "cam_tex"):
+            obj = getattr(self, name, None)
+            if obj is not None:
+                obj.release()
+                setattr(self, name, None)
 
     # ------------------------------------------------------------------ helpers
     @property
@@ -132,6 +144,10 @@ class Renderer:
     def render(self, frame_bgr: np.ndarray | None, effects: list, ctx_frame) -> np.ndarray:
         """Render one frame. ``effects`` are enabled effects sorted by layer order."""
         t0 = time.perf_counter()
+        try:   # make sure our context is current (another GL context may have been created/destroyed)
+            self.ctx.__enter__()
+        except Exception:
+            pass
         h, w = (frame_bgr.shape[:2] if frame_bgr is not None else (self.height, self.width))
         if (w, h) != (self.width, self.height):
             self.resize(w, h)
