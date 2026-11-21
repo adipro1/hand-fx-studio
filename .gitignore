@@ -1,0 +1,47 @@
+# --- Reference videos: never upload ---
+references/
+refrences/
+*.mp4
+*.mov
+*.avi
+*.mkv
+*.webm
+
+# --- Generated output ---
+recordings/
+screenshots/raw/
+*.log
+
+# --- Downloaded model files (auto-downloaded on first run) ---
+assets/models/*.task
+
+# --- User settings (machine specific) ---
+user_settings.json
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+build/
+dist/
+
+# --- Secrets ---
+.env
+*.env
+*.pem
+*.key
+credentials*.json
+.claude/settings.local.json
+
+# --- OS / editor ---
+Thumbs.db
+desktop.ini
+.DS_Store
+.vscode/
+.idea/

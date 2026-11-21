@@ -1,0 +1,7 @@
+mediapipe==1.2.3
+opencv-contrib-python==5.1.0.95
+numpy>=2.0,<3
+moderngl==5.13.0
+PySide6==6.12.0
+imageio-ffmpeg==0.8.1
+pytest>=8
